@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勤怠打刻 - 情報表示型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+  }
+  header {
+    background: linear-gradient(135deg, #1a73e8, #0d47a1);
+    color: #fff;
+    padding: 20px;
+    text-align: center;
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .clock-area {
+    background: linear-gradient(135deg, #1a73e8, #0d47a1);
+    color: #fff;
+    padding: 0 20px 32px;
+    text-align: center;
+  }
+  .clock { font-size: 52px; font-weight: 700; letter-spacing: 2px; }
+  .date { font-size: 14px; opacity: 0.85; margin-top: 4px; }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    margin: -16px 16px 16px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    position: relative;
+  }
+  .card-title {
+    font-size: 13px;
+    color: #888;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .punch-row {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 16px;
+  }
+  .punch-item { text-align: center; }
+  .punch-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+  .punch-time { font-size: 28px; font-weight: 700; color: #333; }
+  .punch-time.empty { color: #ccc; }
+  .divider { width: 1px; background: #eee; }
+  .progress-section { margin-top: 8px; }
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  .progress-header span:last-child { font-weight: 600; color: #333; }
+  .progress-bar {
+    height: 8px;
+    background: #e8e8e8;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #1a73e8, #4dabf7);
+    border-radius: 4px;
+    transition: width 1s ease;
+    width: 0%;
+  }
+  .overtime { background: linear-gradient(90deg, #ea4335, #ff6b6b) !important; }
+  .btn-area {
+    display: flex;
+    gap: 12px;
+    padding: 0 16px;
+    margin-bottom: 16px;
+  }
+  .btn {
+    flex: 1;
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-in { background: linear-gradient(135deg, #1a73e8, #1557b0); }
+  .btn-out { background: linear-gradient(135deg, #ea4335, #c5221f); }
+  .history-card {
+    background: #fff;
+    border-radius: 16px;
+    margin: 0 16px 16px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  .history-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+  .icon-in { background: #e8f0fe; color: #1a73e8; }
+  .icon-out { background: #fce8e6; color: #ea4335; }
+  .history-text { flex: 1; color: #333; }
+  .history-time { color: #888; font-size: 13px; }
+  .toast {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #333;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<header><h1>勤怠打刻</h1></header>
+<div class="clock-area">
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="date" id="date"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">本日の勤務</div>
+  <div class="punch-row">
+    <div class="punch-item">
+      <div class="punch-label">出勤</div>
+      <div class="punch-time empty" id="inTime">--:--</div>
+    </div>
+    <div class="divider"></div>
+    <div class="punch-item">
+      <div class="punch-label">退勤</div>
+      <div class="punch-time empty" id="outTime">--:--</div>
+    </div>
+  </div>
+  <div class="progress-section">
+    <div class="progress-header">
+      <span>勤務時間</span>
+      <span id="workDuration">0:00 / 8:00</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+</div>
+
+<div class="btn-area">
+  <button class="btn btn-in" id="btnIn" onclick="clockIn()">出勤</button>
+  <button class="btn btn-out" id="btnOut" onclick="clockOut()" disabled>退勤</button>
+</div>
+
+<div class="history-card">
+  <div class="card-title">打刻履歴</div>
+  <div id="history">
+    <div style="text-align:center;color:#ccc;padding:20px;font-size:14px;">まだ打刻がありません</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let clockInTime = null;
+  let durationTimer = null;
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('date').textContent =
+      now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function fmt(d) {
+    return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function addHistory(type, time) {
+    const h = document.getElementById('history');
+    if (h.querySelector('div[style]')) h.innerHTML = '';
+    const isIn = type === 'in';
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML =
+      '<div class="history-icon ' + (isIn ? 'icon-in' : 'icon-out') + '">' + (isIn ? '▶' : '■') + '</div>' +
+      '<div class="history-text">' + (isIn ? '出勤打刻' : '退勤打刻') + '</div>' +
+      '<div class="history-time">' + fmt(time) + '</div>';
+    h.prepend(item);
+  }
+
+  function updateDuration() {
+    if (!clockInTime) return;
+    const now = new Date();
+    const diff = now - clockInTime;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const pct = Math.min((diff / (8 * 3600000)) * 100, 100);
+    document.getElementById('workDuration').textContent = h + ':' + String(m).padStart(2, '0') + ' / 8:00';
+    const fill = document.getElementById('progressFill');
+    fill.style.width = pct + '%';
+    if (pct >= 100) fill.classList.add('overtime');
+  }
+
+  function clockIn() {
+    const now = new Date();
+    clockInTime = now;
+    document.getElementById('inTime').textContent = fmt(now);
+    document.getElementById('inTime').classList.remove('empty');
+    document.getElementById('btnIn').disabled = true;
+    document.getElementById('btnOut').disabled = false;
+    addHistory('in', now);
+    showToast('出勤を記録しました');
+    durationTimer = setInterval(updateDuration, 1000);
+    updateDuration();
+  }
+
+  function clockOut() {
+    const now = new Date();
+    clearInterval(durationTimer);
+    document.getElementById('outTime').textContent = fmt(now);
+    document.getElementById('outTime').classList.remove('empty');
+    document.getElementById('btnOut').disabled = true;
+    addHistory('out', now);
+    showToast('退勤を記録しました');
+    updateDuration();
+  }
+</script>
+</body>
+</html>

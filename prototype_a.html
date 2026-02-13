@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勤怠打刻 - シンプル</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+    background: #f5f5f5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: #1a73e8;
+    color: #fff;
+    padding: 16px 20px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 20px;
+  }
+  .clock {
+    font-size: 48px;
+    font-weight: 700;
+    color: #333;
+    letter-spacing: 2px;
+  }
+  .date {
+    font-size: 16px;
+    color: #666;
+    margin-top: -8px;
+  }
+  .btn {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    border: none;
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 16px 0;
+  }
+  .btn:active { transform: scale(0.95); }
+  .btn-clock-in {
+    background: linear-gradient(135deg, #1a73e8, #1557b0);
+    box-shadow: 0 6px 20px rgba(26, 115, 232, 0.4);
+  }
+  .btn-clock-out {
+    background: linear-gradient(135deg, #ea4335, #c5221f);
+    box-shadow: 0 6px 20px rgba(234, 67, 53, 0.4);
+  }
+  .btn-disabled {
+    background: #ccc;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+  .status {
+    font-size: 14px;
+    color: #888;
+    text-align: center;
+    min-height: 40px;
+    line-height: 20px;
+  }
+  .status .time { font-weight: 600; color: #333; }
+  .toast {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #333;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<header>勤怠打刻</header>
+<div class="container">
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="date" id="date"></div>
+  <button class="btn btn-clock-in" id="mainBtn" onclick="handlePunch()">出勤</button>
+  <div class="status" id="status">未出勤</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  let state = 'idle'; // idle -> working -> done
+  let clockInTime = null;
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('date').textContent =
+      now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function handlePunch() {
+    const btn = document.getElementById('mainBtn');
+    const status = document.getElementById('status');
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+
+    if (state === 'idle') {
+      state = 'working';
+      clockInTime = now;
+      btn.textContent = '退勤';
+      btn.className = 'btn btn-clock-out';
+      status.innerHTML = '出勤打刻: <span class="time">' + timeStr + '</span>';
+      showToast('出勤を記録しました');
+    } else if (state === 'working') {
+      state = 'done';
+      btn.textContent = '打刻済';
+      btn.className = 'btn btn-disabled';
+      btn.disabled = true;
+      const inStr = clockInTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      status.innerHTML = '出勤: <span class="time">' + inStr + '</span> ／ 退勤: <span class="time">' + timeStr + '</span>';
+      showToast('退勤を記録しました');
+    }
+  }
+</script>
+</body>
+</html>

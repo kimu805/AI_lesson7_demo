@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勤怠打刻 - カレンダー統合型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    padding-bottom: 80px;
+  }
+  header {
+    background: linear-gradient(135deg, #6c5ce7, #4a3db5);
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .user-badge {
+    background: rgba(255,255,255,0.2);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+  .today-banner {
+    background: linear-gradient(135deg, #6c5ce7, #4a3db5);
+    color: #fff;
+    padding: 0 20px 24px;
+    text-align: center;
+  }
+  .today-clock { font-size: 44px; font-weight: 700; letter-spacing: 2px; }
+  .today-date { font-size: 14px; opacity: 0.85; margin-top: 2px; }
+  .punch-buttons {
+    display: flex;
+    gap: 12px;
+    padding: 0 16px;
+    margin-top: -18px;
+    position: relative;
+    z-index: 1;
+  }
+  .punch-btn {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.1s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .punch-btn:active { transform: scale(0.97); }
+  .punch-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+  .punch-btn.in { background: linear-gradient(135deg, #6c5ce7, #5a4bd1); }
+  .punch-btn.out { background: linear-gradient(135deg, #e17055, #d63031); }
+  .punch-btn.break-start { background: linear-gradient(135deg, #fdcb6e, #e17055); }
+  .punch-btn.break-end { background: linear-gradient(135deg, #00b894, #00a381); }
+
+  .calendar-card {
+    background: #fff;
+    border-radius: 16px;
+    margin: 16px;
+    padding: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .cal-header h2 { font-size: 16px; color: #333; }
+  .cal-nav {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 18px;
+    cursor: pointer;
+    color: #666;
+  }
+  .cal-nav:active { background: #f0f0f0; }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    text-align: center;
+  }
+  .cal-dow {
+    font-size: 11px;
+    color: #999;
+    padding: 4px 0;
+    font-weight: 600;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s;
+  }
+  .cal-day:hover { background: #f5f5f5; }
+  .cal-day.today {
+    background: #6c5ce7;
+    color: #fff;
+    font-weight: 700;
+  }
+  .cal-day.today:hover { background: #5a4bd1; }
+  .cal-day.other { color: #ccc; }
+  .cal-day.sun { color: #e17055; }
+  .cal-day.sat { color: #6c5ce7; }
+  .cal-day.today.sun, .cal-day.today.sat { color: #fff; }
+  .cal-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #00b894;
+    position: absolute;
+    bottom: 4px;
+  }
+  .cal-day.today .cal-dot { background: #fff; }
+  .cal-day.half .cal-dot { background: #fdcb6e; }
+  .cal-day.absent .cal-dot { background: #e17055; }
+
+  .summary-card {
+    background: #fff;
+    border-radius: 16px;
+    margin: 0 16px 16px;
+    padding: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .summary-title { font-size: 13px; color: #888; font-weight: 600; margin-bottom: 12px; }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  .summary-item { text-align: center; }
+  .summary-value { font-size: 24px; font-weight: 700; color: #333; }
+  .summary-label { font-size: 11px; color: #999; margin-top: 2px; }
+
+  .detail-card {
+    background: #fff;
+    border-radius: 16px;
+    margin: 0 16px 16px;
+    padding: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .detail-title { font-size: 13px; color: #888; font-weight: 600; margin-bottom: 12px; }
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #f5f5f5;
+    font-size: 14px;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label { color: #666; }
+  .detail-value { font-weight: 600; color: #333; }
+
+  .toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #333;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<header>
+  <h1>勤怠打刻</h1>
+  <div class="user-badge">田中 太郎</div>
+</header>
+<div class="today-banner">
+  <div class="today-clock" id="clock">--:--:--</div>
+  <div class="today-date" id="date"></div>
+</div>
+
+<div class="punch-buttons">
+  <button class="punch-btn in" id="btnIn" onclick="clockIn()">出勤</button>
+  <button class="punch-btn out" id="btnOut" onclick="clockOut()" disabled>退勤</button>
+</div>
+
+<div class="calendar-card">
+  <div class="cal-header">
+    <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+    <h2 id="calTitle"></h2>
+    <button class="cal-nav" onclick="changeMonth(1)">›</button>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+</div>
+
+<div class="summary-card">
+  <div class="summary-title">今月のサマリー</div>
+  <div class="summary-grid">
+    <div class="summary-item">
+      <div class="summary-value" id="sumDays">0</div>
+      <div class="summary-label">出勤日数</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-value" id="sumHours">0h</div>
+      <div class="summary-label">総勤務時間</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-value" id="sumOvertime">0h</div>
+      <div class="summary-label">残業時間</div>
+    </div>
+  </div>
+</div>
+
+<div class="detail-card" id="detailCard" style="display:none;">
+  <div class="detail-title" id="detailTitle">選択日の詳細</div>
+  <div id="detailBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const today = new Date();
+  let viewYear = today.getFullYear();
+  let viewMonth = today.getMonth();
+  let clockInTime = null;
+
+  // サンプルデータ: 過去の勤怠記録
+  const records = {};
+  (function generateSampleData() {
+    const y = today.getFullYear(), m = today.getMonth();
+    for (let d = 1; d < today.getDate(); d++) {
+      const dt = new Date(y, m, d);
+      const dow = dt.getDay();
+      if (dow === 0 || dow === 6) continue;
+      const inH = 8 + Math.floor(Math.random() * 2);
+      const inM = Math.floor(Math.random() * 30);
+      const outH = 17 + Math.floor(Math.random() * 3);
+      const outM = Math.floor(Math.random() * 60);
+      const key = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      records[key] = {
+        inTime: String(inH).padStart(2, '0') + ':' + String(inM).padStart(2, '0'),
+        outTime: String(outH).padStart(2, '0') + ':' + String(outM).padStart(2, '0'),
+        hours: outH + outM / 60 - inH - inM / 60
+      };
+    }
+  })();
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('date').textContent =
+      now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function fmt(d) {
+    return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function clockIn() {
+    const now = new Date();
+    clockInTime = now;
+    document.getElementById('btnIn').disabled = true;
+    document.getElementById('btnOut').disabled = false;
+    const key = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    records[key] = records[key] || {};
+    records[key].inTime = fmt(now);
+    showToast('出勤を記録しました');
+    renderCalendar();
+    updateSummary();
+  }
+
+  function clockOut() {
+    const now = new Date();
+    document.getElementById('btnOut').disabled = true;
+    const key = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    if (records[key]) {
+      records[key].outTime = fmt(now);
+      if (clockInTime) {
+        records[key].hours = (now - clockInTime) / 3600000;
+      }
+    }
+    showToast('退勤を記録しました');
+    renderCalendar();
+    updateSummary();
+  }
+
+  function changeMonth(delta) {
+    viewMonth += delta;
+    if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+    if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+    renderCalendar();
+    updateSummary();
+  }
+
+  function renderCalendar() {
+    const title = viewYear + '年' + (viewMonth + 1) + '月';
+    document.getElementById('calTitle').textContent = title;
+
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    const dows = ['日', '月', '火', '水', '木', '金', '土'];
+    dows.forEach((d, i) => {
+      const el = document.createElement('div');
+      el.className = 'cal-dow';
+      if (i === 0) el.style.color = '#e17055';
+      if (i === 6) el.style.color = '#6c5ce7';
+      el.textContent = d;
+      grid.appendChild(el);
+    });
+
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const prevDays = new Date(viewYear, viewMonth, 0).getDate();
+
+    for (let i = 0; i < firstDay; i++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day other';
+      el.textContent = prevDays - firstDay + 1 + i;
+      grid.appendChild(el);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const el = document.createElement('div');
+      const dt = new Date(viewYear, viewMonth, d);
+      const dow = dt.getDay();
+      let cls = 'cal-day';
+      if (dow === 0) cls += ' sun';
+      if (dow === 6) cls += ' sat';
+      if (d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear()) {
+        cls += ' today';
+      }
+      el.className = cls;
+      el.textContent = d;
+
+      const key = viewYear + '-' + String(viewMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      if (records[key]) {
+        const dot = document.createElement('div');
+        dot.className = 'cal-dot';
+        el.appendChild(dot);
+      }
+
+      el.addEventListener('click', () => showDayDetail(d, key));
+      grid.appendChild(el);
+    }
+
+    const totalCells = firstDay + daysInMonth;
+    const remaining = (7 - totalCells % 7) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day other';
+      el.textContent = i;
+      grid.appendChild(el);
+    }
+  }
+
+  function showDayDetail(day, key) {
+    const card = document.getElementById('detailCard');
+    const title = document.getElementById('detailTitle');
+    const body = document.getElementById('detailBody');
+    title.textContent = viewMonth + 1 + '月' + day + '日の詳細';
+    card.style.display = 'block';
+
+    if (!records[key]) {
+      body.innerHTML = '<div style="text-align:center;color:#ccc;padding:12px;font-size:14px;">記録なし</div>';
+      return;
+    }
+    const r = records[key];
+    let html = '';
+    html += '<div class="detail-row"><span class="detail-label">出勤</span><span class="detail-value">' + (r.inTime || '--:--') + '</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">退勤</span><span class="detail-value">' + (r.outTime || '--:--') + '</span></div>';
+    if (r.hours) {
+      const h = Math.floor(r.hours);
+      const m = Math.round((r.hours - h) * 60);
+      html += '<div class="detail-row"><span class="detail-label">勤務時間</span><span class="detail-value">' + h + '時間' + m + '分</span></div>';
+      const overtime = Math.max(0, r.hours - 8);
+      if (overtime > 0) {
+        const oh = Math.floor(overtime);
+        const om = Math.round((overtime - oh) * 60);
+        html += '<div class="detail-row"><span class="detail-label">残業</span><span class="detail-value" style="color:#e17055">' + oh + '時間' + om + '分</span></div>';
+      }
+    }
+    body.innerHTML = html;
+  }
+
+  function updateSummary() {
+    let days = 0, totalHours = 0, overtime = 0;
+    for (const key in records) {
+      const parts = key.split('-');
+      if (parseInt(parts[0]) === viewYear && parseInt(parts[1]) === viewMonth + 1) {
+        days++;
+        if (records[key].hours) {
+          totalHours += records[key].hours;
+          overtime += Math.max(0, records[key].hours - 8);
+        }
+      }
+    }
+    document.getElementById('sumDays').textContent = days;
+    document.getElementById('sumHours').textContent = Math.round(totalHours) + 'h';
+    document.getElementById('sumOvertime').textContent = Math.round(overtime) + 'h';
+  }
+
+  renderCalendar();
+  updateSummary();
+</script>
+</body>
+</html>
