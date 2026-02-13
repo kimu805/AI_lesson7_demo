@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勤怠打刻 - 改善版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    padding-bottom: 72px;
+  }
+
+  /* ── Header ── */
+  header {
+    background: linear-gradient(135deg, #1a73e8, #0d47a1);
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .user-name {
+    font-size: 13px;
+    background: rgba(255,255,255,0.18);
+    padding: 4px 12px;
+    border-radius: 12px;
+  }
+
+  /* ── Clock Area ── */
+  .clock-area {
+    background: linear-gradient(135deg, #1a73e8, #0d47a1);
+    color: #fff;
+    padding: 0 20px 28px;
+    text-align: center;
+  }
+  .clock { font-size: 50px; font-weight: 700; letter-spacing: 2px; }
+  .date { font-size: 15px; opacity: 0.85; margin-top: 4px; }
+
+  /* ── Primary Punch Button (large, single) ── */
+  .punch-primary {
+    padding: 0 20px;
+    margin-top: -24px;
+    position: relative;
+    z-index: 2;
+  }
+  .punch-btn-main {
+    width: 100%;
+    padding: 20px;
+    border: none;
+    border-radius: 16px;
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+    letter-spacing: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .punch-btn-main:active { transform: scale(0.97); }
+  .punch-btn-main:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  .punch-btn-main.state-idle {
+    background: linear-gradient(135deg, #1a73e8, #1557b0);
+    box-shadow: 0 6px 24px rgba(26,115,232,0.4);
+  }
+  .punch-btn-main.state-working {
+    background: linear-gradient(135deg, #ea4335, #c5221f);
+    box-shadow: 0 6px 24px rgba(234,67,53,0.4);
+  }
+  .punch-btn-main.state-done {
+    background: #9e9e9e;
+  }
+  .punch-btn-icon { font-size: 26px; }
+
+  /* ── Today Card ── */
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    margin: 16px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  }
+  .card-title {
+    font-size: 14px;
+    color: #888;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .punch-row {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 16px;
+  }
+  .punch-item { text-align: center; flex: 1; }
+  .punch-label {
+    font-size: 14px;
+    color: #888;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  .punch-time {
+    font-size: 32px;
+    font-weight: 700;
+    color: #333;
+  }
+  .punch-time.empty { color: #d0d0d0; }
+  .punch-divider {
+    width: 1px;
+    background: #eee;
+    margin: 0 4px;
+  }
+
+  /* ── Progress ── */
+  .progress-section { margin-top: 4px; }
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .progress-label {
+    font-size: 14px;
+    color: #666;
+  }
+  .progress-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+  }
+  .progress-bar {
+    height: 10px;
+    background: #e8e8e8;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 1s ease;
+    width: 0%;
+    background: linear-gradient(90deg, #1a73e8, #4dabf7);
+  }
+  .progress-fill.overtime {
+    background: linear-gradient(90deg, #ea4335, #ff6b6b);
+  }
+  .progress-hint {
+    font-size: 12px;
+    color: #aaa;
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  /* ── Tabs ── */
+  .tab-bar {
+    display: flex;
+    margin: 0 16px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    background: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: #999;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab.active {
+    background: #1a73e8;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(26,115,232,0.3);
+  }
+
+  /* ── History Tab ── */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .history-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 15px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    margin-right: 14px;
+    flex-shrink: 0;
+  }
+  .icon-in { background: #e8f0fe; color: #1a73e8; }
+  .icon-out { background: #fce8e6; color: #ea4335; }
+  .history-text { flex: 1; color: #333; font-weight: 500; }
+  .history-time { color: #888; font-size: 14px; font-weight: 600; }
+
+  /* ── Monthly Tab ── */
+  .monthly-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .summary-box {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 14px 8px;
+    text-align: center;
+  }
+  .summary-box-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #333;
+  }
+  .summary-box-label {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+  }
+  .mini-cal {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    text-align: center;
+  }
+  .mini-cal-dow {
+    font-size: 11px;
+    color: #aaa;
+    font-weight: 600;
+    padding: 4px 0;
+  }
+  .mini-cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    border-radius: 8px;
+    color: #666;
+    position: relative;
+  }
+  .mini-cal-day.today {
+    background: #1a73e8;
+    color: #fff;
+    font-weight: 700;
+  }
+  .mini-cal-day.worked {
+    background: #e8f0fe;
+    color: #1a73e8;
+    font-weight: 600;
+  }
+  .mini-cal-day.sun { color: #ea4335; }
+  .mini-cal-day.sat { color: #6c5ce7; }
+  .mini-cal-day.today.sun,
+  .mini-cal-day.today.sat { color: #fff; }
+  .mini-cal-day.other { color: #ddd; }
+  .monthly-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .monthly-nav-title { font-size: 15px; font-weight: 600; color: #333; }
+  .monthly-nav-btn {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 4px 14px;
+    font-size: 18px;
+    cursor: pointer;
+    color: #666;
+  }
+  .monthly-nav-btn:active { background: #f0f0f0; }
+
+  /* ── Confirmation Dialog ── */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .overlay.show { display: flex; }
+  .dialog {
+    background: #fff;
+    border-radius: 20px;
+    padding: 28px 24px;
+    width: 300px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+  }
+  .dialog-icon { font-size: 48px; margin-bottom: 12px; }
+  .dialog-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 4px;
+  }
+  .dialog-time {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a73e8;
+    margin: 8px 0 16px;
+  }
+  .dialog-time.out-color { color: #ea4335; }
+  .dialog-actions { display: flex; gap: 10px; }
+  .dialog-btn {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  .dialog-btn:active { transform: scale(0.97); }
+  .dialog-btn-cancel {
+    background: #f0f0f0;
+    color: #666;
+  }
+  .dialog-btn-confirm {
+    background: #1a73e8;
+    color: #fff;
+  }
+  .dialog-btn-confirm.out { background: #ea4335; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #333;
+    color: #fff;
+    padding: 14px 28px;
+    border-radius: 28px;
+    font-size: 15px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Bottom Nav ── */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 1px solid #eee;
+    display: flex;
+    padding: 8px 0;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 10;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: #999;
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 4px 0;
+  }
+  .nav-item.active { color: #1a73e8; }
+  .nav-icon { font-size: 20px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <h1>勤怠打刻</h1>
+  <div class="user-name">田中 太郎</div>
+</header>
+
+<!-- Clock -->
+<div class="clock-area">
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="date" id="date"></div>
+</div>
+
+<!-- Main Punch Button -->
+<div class="punch-primary">
+  <button class="punch-btn-main state-idle" id="punchBtn" onclick="showConfirm()">
+    <span class="punch-btn-icon" id="punchIcon">▶</span>
+    <span id="punchLabel">出勤する</span>
+  </button>
+</div>
+
+<!-- Today Card -->
+<div class="card">
+  <div class="card-title">本日の勤務</div>
+  <div class="punch-row">
+    <div class="punch-item">
+      <div class="punch-label">出勤</div>
+      <div class="punch-time empty" id="inTime">--:--</div>
+    </div>
+    <div class="punch-divider"></div>
+    <div class="punch-item">
+      <div class="punch-label">退勤</div>
+      <div class="punch-time empty" id="outTime">--:--</div>
+    </div>
+  </div>
+  <div class="progress-section">
+    <div class="progress-header">
+      <span class="progress-label">勤務時間</span>
+      <span class="progress-value" id="workDuration">0:00 / 8:00</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-hint" id="progressHint">出勤すると計測が始まります</div>
+  </div>
+</div>
+
+<!-- Tab Section -->
+<div class="tab-bar">
+  <button class="tab active" onclick="switchTab('history')">打刻履歴</button>
+  <button class="tab" onclick="switchTab('monthly')">月次レポート</button>
+</div>
+
+<!-- History Tab -->
+<div class="card tab-content active" id="tab-history">
+  <div id="historyList">
+    <div style="text-align:center;color:#ccc;padding:20px;font-size:15px;">まだ打刻がありません</div>
+  </div>
+</div>
+
+<!-- Monthly Tab -->
+<div class="card tab-content" id="tab-monthly">
+  <div class="monthly-nav">
+    <button class="monthly-nav-btn" onclick="changeMonth(-1)">‹</button>
+    <div class="monthly-nav-title" id="monthTitle"></div>
+    <button class="monthly-nav-btn" onclick="changeMonth(1)">›</button>
+  </div>
+  <div class="monthly-summary">
+    <div class="summary-box">
+      <div class="summary-box-value" id="sumDays">0</div>
+      <div class="summary-box-label">出勤日数</div>
+    </div>
+    <div class="summary-box">
+      <div class="summary-box-value" id="sumHours">0h</div>
+      <div class="summary-box-label">総勤務時間</div>
+    </div>
+    <div class="summary-box">
+      <div class="summary-box-value" id="sumOvertime">0h</div>
+      <div class="summary-box-label">残業時間</div>
+    </div>
+  </div>
+  <div class="mini-cal" id="miniCal"></div>
+</div>
+
+<!-- Confirmation Dialog -->
+<div class="overlay" id="overlay">
+  <div class="dialog">
+    <div class="dialog-icon" id="dialogIcon">▶</div>
+    <div class="dialog-title" id="dialogTitle">出勤しますか？</div>
+    <div class="dialog-time" id="dialogTime">09:00</div>
+    <div class="dialog-actions">
+      <button class="dialog-btn dialog-btn-cancel" onclick="hideConfirm()">キャンセル</button>
+      <button class="dialog-btn dialog-btn-confirm" id="dialogConfirm" onclick="executePunch()">出勤する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <button class="nav-item active"><span class="nav-icon">⏱</span>打刻</button>
+  <button class="nav-item"><span class="nav-icon">📊</span>レポート</button>
+  <button class="nav-item"><span class="nav-icon">⚙</span>設定</button>
+</div>
+
+<script>
+  // ── State ──
+  let state = 'idle'; // idle | working | done
+  let clockInTime = null;
+  let durationTimer = null;
+  const todayDate = new Date();
+  let viewYear = todayDate.getFullYear();
+  let viewMonth = todayDate.getMonth();
+
+  // ── Sample data ──
+  const records = {};
+  (function generateSampleData() {
+    const y = todayDate.getFullYear(), m = todayDate.getMonth();
+    for (let d = 1; d < todayDate.getDate(); d++) {
+      const dt = new Date(y, m, d);
+      if (dt.getDay() === 0 || dt.getDay() === 6) continue;
+      const inH = 8 + Math.floor(Math.random() * 2);
+      const inM = Math.floor(Math.random() * 30);
+      const outH = 17 + Math.floor(Math.random() * 3);
+      const outM = Math.floor(Math.random() * 60);
+      const key = y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      records[key] = {
+        inTime: String(inH).padStart(2,'0') + ':' + String(inM).padStart(2,'0'),
+        outTime: String(outH).padStart(2,'0') + ':' + String(outM).padStart(2,'0'),
+        hours: outH + outM/60 - inH - inM/60
+      };
+    }
+  })();
+
+  // ── Clock ──
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    document.getElementById('date').textContent =
+      now.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── Toast ──
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ── Format ──
+  function fmt(d) {
+    return d.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  // ── Confirm Dialog ──
+  function showConfirm() {
+    if (state === 'done') return;
+    const now = new Date();
+    const overlay = document.getElementById('overlay');
+    const isClockIn = state === 'idle';
+    document.getElementById('dialogIcon').textContent = isClockIn ? '▶' : '■';
+    document.getElementById('dialogTitle').textContent = isClockIn ? '出勤しますか？' : '退勤しますか？';
+    document.getElementById('dialogTime').textContent = fmt(now);
+    document.getElementById('dialogTime').className = 'dialog-time' + (isClockIn ? '' : ' out-color');
+    const btn = document.getElementById('dialogConfirm');
+    btn.textContent = isClockIn ? '出勤する' : '退勤する';
+    btn.className = 'dialog-btn dialog-btn-confirm' + (isClockIn ? '' : ' out');
+    overlay.classList.add('show');
+  }
+
+  function hideConfirm() {
+    document.getElementById('overlay').classList.remove('show');
+  }
+
+  function executePunch() {
+    hideConfirm();
+    if (state === 'idle') {
+      doClockIn();
+    } else if (state === 'working') {
+      doClockOut();
+    }
+  }
+
+  // ── Clock In ──
+  function doClockIn() {
+    const now = new Date();
+    clockInTime = now;
+    state = 'working';
+
+    document.getElementById('inTime').textContent = fmt(now);
+    document.getElementById('inTime').classList.remove('empty');
+
+    const btn = document.getElementById('punchBtn');
+    btn.className = 'punch-btn-main state-working';
+    document.getElementById('punchIcon').textContent = '■';
+    document.getElementById('punchLabel').textContent = '退勤する';
+
+    document.getElementById('progressHint').textContent = '8:00 到達で所定勤務完了';
+
+    const key = dateKey(now);
+    records[key] = records[key] || {};
+    records[key].inTime = fmt(now);
+
+    addHistory('in', now);
+    showToast('✓ 出勤を記録しました');
+
+    durationTimer = setInterval(updateDuration, 1000);
+    updateDuration();
+    renderMiniCal();
+    updateSummary();
+  }
+
+  // ── Clock Out ──
+  function doClockOut() {
+    const now = new Date();
+    state = 'done';
+    clearInterval(durationTimer);
+
+    document.getElementById('outTime').textContent = fmt(now);
+    document.getElementById('outTime').classList.remove('empty');
+
+    const btn = document.getElementById('punchBtn');
+    btn.className = 'punch-btn-main state-done';
+    btn.disabled = true;
+    document.getElementById('punchIcon').textContent = '✓';
+    document.getElementById('punchLabel').textContent = '本日の打刻完了';
+
+    const key = dateKey(now);
+    if (records[key]) {
+      records[key].outTime = fmt(now);
+      if (clockInTime) records[key].hours = (now - clockInTime) / 3600000;
+    }
+
+    addHistory('out', now);
+    updateDuration();
+    showToast('✓ 退勤を記録しました');
+
+    const hours = records[key]?.hours || 0;
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    document.getElementById('progressHint').textContent = '本日の勤務: ' + h + '時間' + m + '分 お疲れさまでした';
+
+    renderMiniCal();
+    updateSummary();
+  }
+
+  // ── Duration ──
+  function updateDuration() {
+    if (!clockInTime) return;
+    const now = new Date();
+    const diff = state === 'done'
+      ? (function(){ const k = dateKey(now); return (records[k]?.hours || 0) * 3600000; })()
+      : now - clockInTime;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const pct = Math.min((diff / (8*3600000)) * 100, 100);
+    document.getElementById('workDuration').textContent = h + ':' + String(m).padStart(2,'0') + ' / 8:00';
+    const fill = document.getElementById('progressFill');
+    fill.style.width = pct + '%';
+    if (pct >= 100) fill.classList.add('overtime');
+    else fill.classList.remove('overtime');
+  }
+
+  // ── History ──
+  function addHistory(type, time) {
+    const list = document.getElementById('historyList');
+    if (list.querySelector('div[style]')) list.innerHTML = '';
+    const isIn = type === 'in';
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML =
+      '<div class="history-icon ' + (isIn ? 'icon-in' : 'icon-out') + '">' + (isIn ? '▶' : '■') + '</div>' +
+      '<div class="history-text">' + (isIn ? '出勤打刻' : '退勤打刻') + '</div>' +
+      '<div class="history-time">' + fmt(time) + '</div>';
+    list.prepend(item);
+  }
+
+  // ── Tabs ──
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active', (name === 'history' && i === 0) || (name === 'monthly' && i === 1));
+    });
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'monthly') {
+      renderMiniCal();
+      updateSummary();
+    }
+  }
+
+  // ── Monthly ──
+  function dateKey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  function changeMonth(delta) {
+    viewMonth += delta;
+    if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+    if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+    renderMiniCal();
+    updateSummary();
+  }
+
+  function renderMiniCal() {
+    document.getElementById('monthTitle').textContent = viewYear + '年' + (viewMonth+1) + '月';
+    const grid = document.getElementById('miniCal');
+    grid.innerHTML = '';
+    const dows = ['日','月','火','水','木','金','土'];
+    dows.forEach((d, i) => {
+      const el = document.createElement('div');
+      el.className = 'mini-cal-dow';
+      if (i === 0) el.style.color = '#ea4335';
+      if (i === 6) el.style.color = '#6c5ce7';
+      el.textContent = d;
+      grid.appendChild(el);
+    });
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+    const prevDays = new Date(viewYear, viewMonth, 0).getDate();
+    for (let i = 0; i < firstDay; i++) {
+      const el = document.createElement('div');
+      el.className = 'mini-cal-day other';
+      el.textContent = prevDays - firstDay + 1 + i;
+      grid.appendChild(el);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const el = document.createElement('div');
+      const dt = new Date(viewYear, viewMonth, d);
+      const dow = dt.getDay();
+      let cls = 'mini-cal-day';
+      if (dow === 0) cls += ' sun';
+      if (dow === 6) cls += ' sat';
+      const isToday = d === todayDate.getDate() && viewMonth === todayDate.getMonth() && viewYear === todayDate.getFullYear();
+      if (isToday) cls += ' today';
+      const key = viewYear + '-' + String(viewMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      if (records[key] && !isToday) cls += ' worked';
+      el.className = cls;
+      el.textContent = d;
+      grid.appendChild(el);
+    }
+    const totalCells = firstDay + daysInMonth;
+    const rem = (7 - totalCells % 7) % 7;
+    for (let i = 1; i <= rem; i++) {
+      const el = document.createElement('div');
+      el.className = 'mini-cal-day other';
+      el.textContent = i;
+      grid.appendChild(el);
+    }
+  }
+
+  function updateSummary() {
+    let days = 0, totalH = 0, ot = 0;
+    for (const key in records) {
+      const p = key.split('-');
+      if (parseInt(p[0]) === viewYear && parseInt(p[1]) === viewMonth+1) {
+        days++;
+        if (records[key].hours) {
+          totalH += records[key].hours;
+          ot += Math.max(0, records[key].hours - 8);
+        }
+      }
+    }
+    document.getElementById('sumDays').textContent = days;
+    document.getElementById('sumHours').textContent = Math.round(totalH) + 'h';
+    document.getElementById('sumOvertime').textContent = Math.round(ot) + 'h';
+  }
+
+  // ── Init ──
+  renderMiniCal();
+  updateSummary();
+</script>
+</body>
+</html>
