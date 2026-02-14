@@ -6,12 +6,12 @@
  * - 18:00以降（18:00含む）を残業とする
  * - 休憩時間: 固定1時間（12:00〜13:00）
  * - 遅刻は丸め対象外（実時刻で記録）、遅刻と残業は相殺する
- * - 月45時間超過で割増（超過分のみ）
- * - 休日出勤: 全勤務時間が残業扱い、45時間上限に含める
+ * - 月60時間超過で割増（超過分のみ）
+ * - 休日出勤: 全勤務時間が残業扱い、60時間上限に含める
  * - 日付またぎ: 出勤打刻日の月に計上
  * - 未承認/却下の残業申請: 計上しない
  * - 打刻忘れ: 保留扱い（計算から除外）
- * - 月途中入退社: 45時間を日割り
+ * - 月途中入退社: 60時間を日割り
  */
 
 // ─── 型定義 ───
@@ -61,7 +61,7 @@ export interface MonthlyOvertimeResult {
 // ─── 定数 ───
 
 const FIFTEEN_MIN_MS = 15 * 60 * 1000;
-const REGULAR_OVERTIME_LIMIT_MINUTES = 2700; // 45時間
+const REGULAR_OVERTIME_LIMIT_MINUTES = 3600; // 60時間
 
 // ─── ヘルパー ───
 
@@ -252,7 +252,7 @@ export function calcMonthlyOvertime(
     }
   }
 
-  // ── 45時間の日割り上限 ──
+  // ── 60時間の日割り上限 ──
   const limit = Math.floor(
     REGULAR_OVERTIME_LIMIT_MINUTES *
       (input.actualWorkingDays / input.workingDaysInMonth)

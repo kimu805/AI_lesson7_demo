@@ -189,7 +189,7 @@ tables:
 
   # ── 残業上限超過申請 ──
   overtime_limit_requests:
-    description: "REQ-011/013: 月45時間超過の人事部承認"
+    description: "REQ-011/013: 月60時間超過の人事部承認"
     columns:
       - name: id
         type: BIGINT
@@ -612,7 +612,7 @@ tables:
 
   # ── 残業上限超過申請 ──
   overtime_limit_requests:
-    description: "REQ-011/013: 月45時間超過の人事部承認"
+    description: "REQ-011/013: 月60時間超過の人事部承認"
     columns:
       - name: id
         type: BIGINT

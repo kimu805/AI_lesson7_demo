@@ -7,13 +7,13 @@
  * - 休憩時間: 固定1時間（12:00〜13:00）
  * - 遅刻は丸め対象外（実時刻で記録）
  * - 遅刻と残業は相殺する
- * - 月45時間（含む）超過で割増（超過分のみ）
+ * - 月60時間（含む）超過で割増（超過分のみ）
  * - 割増率: 通常残業25%、月60時間超50%、深夜25%（別途加算）
  * - 休日出勤: 全勤務時間が残業扱い、45時間上限に含める
  * - 日付またぎ: 出勤打刻日の月に計上
  * - 未承認/却下の残業申請: 計上しない
  * - 打刻忘れ: 保留扱い（計算から除外）
- * - 月途中入退社: 45時間を日割り
+ * - 月途中入退社: 60時間を日割り
  * - 集計期間: 毎月1日〜末日
  * - 出力形式: "HH:MM"
  * - エラー時: 例外をスロー
@@ -426,11 +426,11 @@ describe("calcMonthlyOvertime: 月次残業時間の集計", () => {
     expect(result.excessOvertimeMinutes).toBe(0);
   });
 
-  // --- 45時間の境界値（Q-10: 45時間ちょうどを含む） ---
+  // --- 60時間の境界値（Q-10: 60時間ちょうどを含む） ---
 
-  test("月45時間ちょうどは割増対象（超過分は0分だが閾値に到達）", () => {
-    // 45h = 2700分。22日 × 122.7分 ≈ 15日×180分(3h)
-    const summaries = Array.from({ length: 15 }, (_, i) =>
+  test("月60時間ちょうどは割増対象（超過分は0分だが閾値に到達）", () => {
+    // 60h = 3600分。20日×180分(3h) = 3600分
+    const summaries = Array.from({ length: 20 }, (_, i) =>
       makeSummary({
         workDate: `2026-02-${String(i + 1).padStart(2, "0")}`,
         clockInAt: d(`2026-02-${String(i + 1).padStart(2, "0")}T09:00:00`),
@@ -442,16 +442,16 @@ describe("calcMonthlyOvertime: 月次残業時間の集計", () => {
     const result = calcMonthlyOvertime(
       makeInput({ dailySummaries: summaries })
     );
-    // 15日 × 180分 = 2700分 = 45:00
-    expect(result.totalOvertimeMinutes).toBe(2700);
-    expect(result.regularOvertimeMinutes).toBe(2700);
+    // 20日 × 180分 = 3600分 = 60:00
+    expect(result.totalOvertimeMinutes).toBe(3600);
+    expect(result.regularOvertimeMinutes).toBe(3600);
     expect(result.excessOvertimeMinutes).toBe(0);
-    expect(result.totalOvertime).toBe("45:00");
+    expect(result.totalOvertime).toBe("60:00");
   });
 
-  test("月45時間1分で超過分1分が発生", () => {
+  test("月60時間1分で超過分1分が発生", () => {
     const summaries = [
-      ...Array.from({ length: 15 }, (_, i) =>
+      ...Array.from({ length: 20 }, (_, i) =>
         makeSummary({
           workDate: `2026-02-${String(i + 1).padStart(2, "0")}`,
           clockInAt: d(`2026-02-${String(i + 1).padStart(2, "0")}T09:00:00`),
@@ -461,9 +461,9 @@ describe("calcMonthlyOvertime: 月次残業時間の集計", () => {
         })
       ),
       makeSummary({
-        workDate: "2026-02-16",
-        clockInAt: d("2026-02-16T09:00:00"),
-        clockOutAt: d("2026-02-16T18:15:00"),
+        workDate: "2026-02-21",
+        clockInAt: d("2026-02-21T09:00:00"),
+        clockOutAt: d("2026-02-21T18:15:00"),
         workType: "normal",
         overtimeMinutes: 15,
       }),
@@ -471,32 +471,32 @@ describe("calcMonthlyOvertime: 月次残業時間の集計", () => {
     const result = calcMonthlyOvertime(
       makeInput({ dailySummaries: summaries })
     );
-    // 2700 + 15 = 2715分 = 45:15
-    expect(result.totalOvertimeMinutes).toBe(2715);
-    expect(result.regularOvertimeMinutes).toBe(2700); // 45:00
+    // 3600 + 15 = 3615分 = 60:15
+    expect(result.totalOvertimeMinutes).toBe(3615);
+    expect(result.regularOvertimeMinutes).toBe(3600); // 60:00
     expect(result.excessOvertimeMinutes).toBe(15); // 00:15
   });
 
   // --- Q-11: 割増は超過分のみ ---
 
-  test("月50時間の場合、超過分は5時間のみ", () => {
+  test("月70時間の場合、超過分は10時間のみ", () => {
     const summaries = Array.from({ length: 20 }, (_, i) =>
       makeSummary({
         workDate: `2026-02-${String(i + 1).padStart(2, "0")}`,
         clockInAt: d(`2026-02-${String(i + 1).padStart(2, "0")}T09:00:00`),
-        clockOutAt: d(`2026-02-${String(i + 1).padStart(2, "0")}T20:30:00`),
+        clockOutAt: d(`2026-02-${String(i + 1).padStart(2, "0")}T21:30:00`),
         workType: "normal",
-        overtimeMinutes: 150,
+        overtimeMinutes: 210,
       })
     );
     const result = calcMonthlyOvertime(
       makeInput({ dailySummaries: summaries })
     );
-    // 20 × 150 = 3000分 = 50:00
-    expect(result.totalOvertimeMinutes).toBe(3000);
-    expect(result.regularOvertimeMinutes).toBe(2700); // 45:00
-    expect(result.excessOvertimeMinutes).toBe(300); // 5:00
-    expect(result.excessOvertime).toBe("05:00");
+    // 20 × 210 = 4200分 = 70:00
+    expect(result.totalOvertimeMinutes).toBe(4200);
+    expect(result.regularOvertimeMinutes).toBe(3600); // 60:00
+    expect(result.excessOvertimeMinutes).toBe(600); // 10:00
+    expect(result.excessOvertime).toBe("10:00");
   });
 
   // --- 休日出勤（Q-18: 45時間に含める、Q-19: 全時間が残業） ---
@@ -506,9 +506,9 @@ describe("calcMonthlyOvertime: 月次残業時間の集計", () => {
       makeSummary({
         workDate: `2026-02-${String(i + 1).padStart(2, "0")}`,
         clockInAt: d(`2026-02-${String(i + 1).padStart(2, "0")}T09:00:00`),
-        clockOutAt: d(`2026-02-${String(i + 1).padStart(2, "0")}T21:00:00`),
+        clockOutAt: d(`2026-02-${String(i + 1).padStart(2, "0")}T21:20:00`),
         workType: "normal",
-        overtimeMinutes: 150,
+        overtimeMinutes: 200,
       })
     );
     const holidayDay = makeSummary({
@@ -522,10 +522,10 @@ describe("calcMonthlyOvertime: 月次残業時間の集計", () => {
     const result = calcMonthlyOvertime(
       makeInput({ dailySummaries: summaries })
     );
-    // 通常: 18 × 150 = 2700分 + 休日: 420分 = 3120分 = 52:00
-    expect(result.totalOvertimeMinutes).toBe(3120);
+    // 通常: 18 × 200 = 3600分 + 休日: 420分 = 4020分 = 67:00
+    expect(result.totalOvertimeMinutes).toBe(4020);
     expect(result.holidayWorkMinutes).toBe(420);
-    expect(result.excessOvertimeMinutes).toBe(420); // 3120 - 2700 = 420
+    expect(result.excessOvertimeMinutes).toBe(420); // 4020 - 3600 = 420
   });
 
   test("休日出勤のみで45時間を超える場合", () => {
@@ -547,7 +547,7 @@ describe("calcMonthlyOvertime: 月次残業時間の集計", () => {
     );
     // 7 × 600 = 4200分 = 70:00
     expect(result.totalOvertimeMinutes).toBe(4200);
-    expect(result.excessOvertimeMinutes).toBe(1500); // 4200 - 2700
+    expect(result.excessOvertimeMinutes).toBe(600); // 4200 - 3600
   });
 
   // --- 深夜残業（Q-13: 別途加算） ---
@@ -589,12 +589,12 @@ describe("calcMonthlyOvertime: 月次残業時間の集計", () => {
         actualWorkingDays: 10,
       })
     );
-    // 上限 = 45h × (10/20) = 22.5h = 1350分
+    // 上限 = 60h × (10/20) = 30h = 1800分
     // 実績 = 10 × 210 = 2100分 = 35:00
-    // 超過 = 2100 - 1350 = 750分
+    // 超過 = 2100 - 1800 = 300分
     expect(result.totalOvertimeMinutes).toBe(2100);
-    expect(result.regularOvertimeMinutes).toBe(1350);
-    expect(result.excessOvertimeMinutes).toBe(750);
+    expect(result.regularOvertimeMinutes).toBe(1800);
+    expect(result.excessOvertimeMinutes).toBe(300);
   });
 
   // --- 混在ケース ---
@@ -664,8 +664,8 @@ describe("formatTime: HH:MM形式への変換", () => {
     expect(formatTime(90)).toBe("01:30");
   });
 
-  test("2700分 → '45:00'", () => {
-    expect(formatTime(2700)).toBe("45:00");
+  test("3600分 → '60:00'", () => {
+    expect(formatTime(3600)).toBe("60:00");
   });
 
   test("2715分 → '45:15'", () => {
@@ -926,7 +926,7 @@ describe("エッジケース", () => {
     // 31 × 360 = 11160分 = 186:00
     expect(result.totalOvertimeMinutes).toBe(11160);
     expect(result.totalOvertime).toBe("186:00");
-    expect(result.regularOvertimeMinutes).toBe(2700); // 45:00
-    expect(result.excessOvertimeMinutes).toBe(8460); // 141:00
+    expect(result.regularOvertimeMinutes).toBe(3600); // 60:00
+    expect(result.excessOvertimeMinutes).toBe(7560); // 126:00
   });
 });
